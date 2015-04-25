@@ -1,12 +1,13 @@
 '''
-A Sine Language subclass to send messages over audio devices.
+A Sine Language subclass to recieve messages over audio devices.
 
-Alex Calamaro and Liz Shank
+Alex Calamaro
 Carleton College
 '''
 import os
 import pyaudio 
 import struct
+import math
 import binascii #get hex values from packed structs
 
 rate = 44100
