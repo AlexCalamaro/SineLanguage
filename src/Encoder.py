@@ -1,4 +1,4 @@
-#############################
+ #############################
 # Encoder.py
 # 
 #
@@ -49,7 +49,7 @@ class Encoder:
     def writeWave(self, frequencies):
         wfile = wave.open('message.wav', 'w')
         
-        wfile.setparams((1, 2, RATE, 0, 'NONE', 'not compressed'))
+        wfile.setparams((1, 2, 44100, 0, 'NONE', 'not compressed'))
         wData = ""
         
         for i in frequencies:

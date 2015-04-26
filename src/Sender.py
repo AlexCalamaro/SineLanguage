@@ -14,11 +14,13 @@ import binascii #get hex values from packed structs
 class Sender:
     def __init__(self):
         #print self.outputAux.get_default_output_device_info() #Prints the default output device
-        self.notelength = 1
-        self.toneConstant = 250
-        self.toneFloor = 500
+        self.notelength = 0.5
+        self.toneConstant = 100
+        self.toneFloor = 600
+        self.borderTone = 500
         self.hexChars = ['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f']
         self.sampleRate = 44100
+        self.volume = 4000
         
     def send(self, messageType, message):
         freqArr = self.getFreqs(message)
@@ -33,16 +35,15 @@ class Sender:
         wData = ""
         
         # Add data
-        for i in freqArr:
-            for j in range(0, self.sampleRate*(self.notelength)):
-                wData += struct.pack('h', 500.0*(math.sin(i)))
-                #wData += struct.pack('h', 500.0*(math.sin(j*i/(RATE))))
+        for note in freqArr:
+            for sample in range(0, int(self.sampleRate*(self.notelength))):
+                
+                wData += struct.pack('h', self.volume*(math.sin(2*sample*note*math.pi/(self.sampleRate))))
 
         # Close and reopen in read mode
         wFile.writeframes(wData)
         wFile.close()
         wFile = wave.open('message.wav','rb')
-        print wFile.getsampwidth()
 
         # Define stream chunk
         chunk = 1024
@@ -70,9 +71,23 @@ class Sender:
     #Should take in an input array of hexadecimal and output an array of frequencies
     def getFreqs(self,inputArr):
         freqArr = []
+        prevVal = 0
+
+        #Indicates start/end of message
+        freqArr.append(self.borderTone)
+
         for char in inputArr:
-            freqArr.append(self.toneFloor + (self.hexChars.index(char))*self.toneConstant)
+            frequency = self.toneFloor + (self.hexChars.index(char))*self.toneConstant
+
+            # In case of repeated values, the reciever needs to be able to tell
+            # that the same note is played twice, so we add a border tone
+            if(frequency == prevVal):
+                freqArr.append(self.borderTone)
+
+            freqArr.append(frequency)
+            prevVal = frequency
         
+        freqArr.append(self.borderTone)
         print "Frequencies: ", freqArr
         return freqArr
         
