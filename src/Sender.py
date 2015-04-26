@@ -14,10 +14,10 @@ import binascii #get hex values from packed structs
 class Sender:
     def __init__(self):
         #print self.outputAux.get_default_output_device_info() #Prints the default output device
-        self.notelength = 0.5
+        self.notelength = 0.25
         self.toneConstant = 100
-        self.toneFloor = 600
-        self.borderTone = 500
+        self.toneFloor = 400
+        self.borderTone = 300
         self.hexChars = ['0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f']
         self.sampleRate = 44100
         self.volume = 4000
@@ -25,8 +25,6 @@ class Sender:
     def send(self, messageType, message):
         freqArr = self.getFreqs(message)
 
-
-        
         # Create new .wav file
         wFile = wave.open('message.wav', 'w')
         
