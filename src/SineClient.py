@@ -111,5 +111,7 @@ class SineClient:
 
         self.console()
 
-run = SineClient()
-run.main()
+
+SineClient().main()
+#run = SineClient()
+#run.main()

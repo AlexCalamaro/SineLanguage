@@ -8,6 +8,7 @@ The algorithm in decode() is cannabalized from Justin Peel at:
 http://stackoverflow.com/questions/2648151/python-frequency-detection
 '''
 import os
+import sys
 import pyaudio
 import numpy as np
 import struct
@@ -35,7 +36,7 @@ class Receiver:
         self.toneConstant = 100
         self.toneFloor = 400
         self.borderTone = 300
-        self.freqErr = 10
+        self.freqErr = 2
 
         self.rawData = []
         self.frequencyData = []
@@ -45,13 +46,16 @@ class Receiver:
     def decodeFreq(self):
         print "In decodeFreq()"
 
+        '''
         workBuffer = []
         for i in range(self.chunk*self.sampleWidth):
             workBuffer.append(self.rawData.pop[0])
+        '''
 
+        workBuffer = self.rawData.pop(0)
 
         # unpack the data and times by the hamming window
-        indata = np.array(wave.struct.unpack("%dh"%(len(workBuffer)/swidth),\
+        indata = np.array(wave.struct.unpack("%dh"%(len(workBuffer)/self.sampleWidth),\
                                              workBuffer))*self.window
         # Take the fft and square each value
         fftData=abs(np.fft.rfft(indata))**2
@@ -63,10 +67,10 @@ class Receiver:
             y0,y1,y2 = np.log(fftData[which-1:which+2:])
             x1 = (y2 - y0) * .5 / (2 * y1 - y2 - y0)
             # find the frequency and output it
-            thefreq = (which+x1)*RATE/chunk
+            thefreq = (which+x1)*self.sampleRate/self.chunk
             print "The freq is %f Hz." % (thefreq)
         else:
-            thefreq = which*RATE/chunk
+            thefreq = which*self.sampleRate/self.chunk
             print "The freq is %f Hz." % (thefreq)
 
         self.frequencyData.append(thefreq)
@@ -81,6 +85,7 @@ class Receiver:
 
         # Normalize data within error parameter. Ignore other samples
         for sample in self.frequencyData:
+            sample = sample - self.toneFloor
             if sample > self.borderTone - self.freqErr:
                 sampleError = sample%self.toneConstant
 
@@ -92,7 +97,7 @@ class Receiver:
                     sample = sample + (self.toneConstant-sampleError)
                     acceptableSamples.append(sample)
 
-        # Remove repeats
+        # Remove repeats in working data
         prevNote = None
         for note in acceptableSamples:
             if (note != prevNote):
@@ -101,11 +106,31 @@ class Receiver:
 
         # Calculate hex characters from tones
         for sample in noRepeatSamples:
-            index = sample/100
-            if(index == borderTone):
-                cleanedOutput.append('#')
+            sample = int(sample)
+
+            if (sample == self.borderTone):
+                self.cleanedOutput.append('#')
+
             else:
-                cleanedOutput.append(self.hexChars[index])
+                sample = sample - self.toneFloor
+                index = sample/100
+                print index
+                try:
+                    self.cleanedOutput.append(self.hexChars[index])
+                except Exception, e:
+                    print "Out-of-range frequencies detected"
+
+
+        # Remove repeats in final data (stupid design but w/e)
+        if len(self.cleanedOutput) > 1:
+            for i in range (len(self.cleanedOutput)-1):
+                if self.cleanedOutput[i] == self.cleanedOutput[i+1]:
+                    self.cleanedOutput[i+1] = '$'
+            while (self.cleanedOutput.count('$') > 0):
+                self.cleanedOutput.remove('$')
+
+
+        #print "Cleaned Samples: ", self.cleanedOutput
 
     # Handle protocol--determine which parts of message signify message type, payload, etc...
     def evaluate(self):
@@ -118,15 +143,12 @@ class Receiver:
         def callback(in_data, frame_count, time_info, status):
             print "In callback \r\n"
             self.rawData.append(in_data)
-            if len(self.rawData)>self.chunk*self.sampleWidth:
-                self.decodeFreq()
+            self.decodeFreq()
             return (in_data, pyaudio.paContinue)
 
         return callback
 
     def record(self):
-
-        recordDuration = 2
 
         self.s = self.p.open(format = self.audioFormat,
                 channels = self.channels,
@@ -148,13 +170,8 @@ class Receiver:
 
     def execute(self):
         self.record()
-        time.sleep(5)
-        self.stopRecording()
-
-        self.s.close()
-        self.p.terminate()
-
-        print cleanedOutput
+        while(True):
+            time.sleep(0.1)
 
 
 
