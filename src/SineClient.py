@@ -49,6 +49,7 @@ class SineClient:
             return
         
         def listen():
+            self.reciever.execute()
             return
         
         def utilities():
