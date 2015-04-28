@@ -22,7 +22,7 @@ class Receiver:
         self.p = pyaudio.PyAudio()
         self.s = None
 
-        self.recordDuration = 0.25
+        self.recordDuration = 1
         self.channels = 1
         self.audioFormat = pyaudio.paInt16
         self.sampleRate = 44100
@@ -44,6 +44,7 @@ class Receiver:
 
     # Calculate frequencies from raw data
     def decodeFreq(self):
+        newFreq = []
         print "In decodeFreq()"
 
         '''
@@ -68,27 +69,30 @@ class Receiver:
             x1 = (y2 - y0) * .5 / (2 * y1 - y2 - y0)
             # find the frequency and output it
             thefreq = (which+x1)*self.sampleRate/self.chunk
-            print "The freq is %f Hz." % (thefreq)
+            #print "The freq is %f Hz." % (thefreq)
         else:
             thefreq = which*self.sampleRate/self.chunk
-            print "The freq is %f Hz." % (thefreq)
+            #print "The freq is %f Hz." % (thefreq)
 
-        self.frequencyData.append(thefreq)
+        newFreq.append(thefreq)
         #not clearing raw_data might cause repeating detected frequencies?
 
-        self.parseFrequencyData()
+        self.parseFrequencyData(newFreq)
 
     # Clean up raw data and extract individual notes
-    def parseFrequencyData(self):
+    def parseFrequencyData(self, newData):
         acceptableSamples = []
         noRepeatSamples = []
 
         # Normalize data within error parameter. Ignore other samples
-        for sample in self.frequencyData:
+        for sample in newData:
             sample = sample - self.toneFloor
             if sample > self.borderTone - self.freqErr:
                 sampleError = sample%self.toneConstant
+                #print "Sample error: ", sampleError, "Sample: ", sample
 
+                # Check both sides of error. Turns out the detection algorithm is pretty good
+                #   so one hz of error is plenty.
                 if (sampleError < self.freqErr):
                     sample = sample-sampleError
                     acceptableSamples.append(sample)
@@ -104,50 +108,59 @@ class Receiver:
                 noRepeatSamples.append(note)
             prevNote = note
 
+        #print acceptableSamples
+
         # Calculate hex characters from tones
         for sample in noRepeatSamples:
             sample = int(sample)
 
+            # Special case for borderTone since I set this up like an idiot
             if (sample == self.borderTone):
                 self.cleanedOutput.append('#')
 
             else:
+                # Should convert frequency to index-of-character representation
                 sample = sample - self.toneFloor
                 index = sample/100
-                print index
+
                 try:
                     self.cleanedOutput.append(self.hexChars[index])
                 except Exception, e:
-                    print "Out-of-range frequencies detected"
+                    pass
+                    #print "Out-of-range frequencies detected"
 
+        # Attempt to remove duplicates since in 1 second of a freq playing
+        #   that frequency is recorded a lot of times. We only want one character per tone
+        #   To make this easier, a bordertone needs to be inserted between any repeated chars
+        #   on the sender side.
+        i = 0
+        if(len(self.cleanedOutput) > 1):
+            while(i < len(self.cleanedOutput)-1):
+                if(self.cleanedOutput[i] == self.cleanedOutput[i+1]):
+                    self.cleanedOutput.pop(i+1)
 
-        # Remove repeats in final data (stupid design but w/e)
-        if len(self.cleanedOutput) > 1:
-            for i in range (len(self.cleanedOutput)-1):
-                if self.cleanedOutput[i] == self.cleanedOutput[i+1]:
-                    self.cleanedOutput[i+1] = '$'
-            while (self.cleanedOutput.count('$') > 0):
-                self.cleanedOutput.remove('$')
-
-
-        #print "Cleaned Samples: ", self.cleanedOutput
+        self.evaluate()
 
     # Handle protocol--determine which parts of message signify message type, payload, etc...
     def evaluate(self):
-        return
+        if len(self.cleanedOutput) > 5:
+            self.stopRecording()
+        print self.cleanedOutput
 
 
-
+    # Callback is supposedly called repeatedly until pyaudio.paComplete is returned
+    #   but right now it's exiting seemingly randomly
     def getCallback(self):
 
         def callback(in_data, frame_count, time_info, status):
             print "In callback \r\n"
             self.rawData.append(in_data)
             self.decodeFreq()
-            return (in_data, pyaudio.paContinue)
+            return (None, pyaudio.paContinue)
 
         return callback
 
+    # Set up callback-infused recorder. Maybe can put the "work" here?
     def record(self):
 
         self.s = self.p.open(format = self.audioFormat,
@@ -158,20 +171,25 @@ class Receiver:
                 stream_callback = self.getCallback())
 
         self.s.start_stream()
+        while self.s.is_active():
+            time.sleep(0.1)
         return self
 
     def stopRecording(self):
         self.s.stop_stream()
         return self
 
+    # Closes streams etc.
     def clean(self):
         self.s.close()
         self.p.terminate()
 
     def execute(self):
         self.record()
-        while(True):
-            time.sleep(0.1)
+
+        # When done (self.clean is getting weird errors):
+        #self.clean()
+
 
 
 

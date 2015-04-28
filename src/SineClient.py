@@ -44,17 +44,20 @@ class SineClient:
             print 'Packed Value   :', hex, " Length : ", len(hex)
             self.transmitter.send("text", hex)
 
-
+        # Take a file path and attempt to transfer an entire file
         def dataInput():
             return
 
+        # Listen for valid messages
         def listen():
             self.receiver.execute()
             return
 
+        # Cool stuff to go here?
         def utilities():
             return
 
+        # About screen
         def about():
             self.clearScreen()
             print "This program is a revision of Sine Language,\r\n",\
@@ -80,9 +83,6 @@ class SineClient:
         except KeyError:
             print "Invalid input."
             return
-
-
-
 
     def listener(self):
         #Make a class for this
@@ -111,7 +111,5 @@ class SineClient:
 
         self.console()
 
-
-SineClient().main()
-#run = SineClient()
-#run.main()
+run = SineClient()
+run.main()
